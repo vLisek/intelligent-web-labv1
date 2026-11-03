@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-from recommender import recommend
+from recommender import recommend, users_list
 
 app = Flask(__name__)
 
@@ -92,10 +92,14 @@ def api_recommend():
 
     # Jeżeli zwróci None (czyli nie było takiego usera w pliku CSV), błąd HTTP 404
     if results is None:
-        return jsonify({"error": "Uzytkownik nie znaleziony w bazie"}), 404
+        return jsonify({"error": "Uzytkownik nie znaleziony w bazie", "known_users": users_list}), 404
 
     # Zwracamy spakowany wynik (tytuł, przewidywana ocena i dla kogo z sąsiadów)
     return jsonify(results)
+
+@app.route("/api/users")
+def api_users():
+    return jsonify(users_list)
 
 if __name__ == "__main__":
     app.run(debug=True)
