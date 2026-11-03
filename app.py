@@ -67,29 +67,34 @@ def add_product():
     # Zwracamy dodany produkt i kod 201 Created
     return jsonify(new_product), 201
 
+
 @app.route("/api/recommend")
 def api_recommend():
-    # Pobranie parametrów z URL
-    title = request.args.get("title")
+    # Pobieramy nazwę użytkownika oraz parametry
+    user = request.args.get("user")
     top_n = request.args.get("top_n", default=5, type=int)
-    genre = request.args.get("genre")  # Filtr dla zadania z wyzwaniem
 
-    # Walidacja: Brak tytułu zwraca błąd 400 (Bad Request)
-    if not title:
-        return jsonify({"error": "Brak parametru title"}), 400
+    # Wyłuskujemy 'k' (ilość sąsiadów)
+    k = request.args.get("k", default=3, type=int)
 
-    # Walidacja: top_n musi być z przedziału 1-10, inaczej wymuszamy domyślne 5
+    # Brak podanego użytkownika w parametrze to błąd HTTP 400
+    if not user:
+        return jsonify({"error": "Brak parametru user"}), 400
+
+    # Walidacja limitów wyzwania: top_n od 1 do 10, k od 1 do 11
     if not (1 <= top_n <= 10):
         top_n = 5
+    if not (1 <= k <= 11):
+        k = 3
 
-    # Wywołanie funkcji z recommender.py
-    results = recommend(title, top_n, genre)
+    # Uruchomienie nowej logiki collaborative filtering
+    results = recommend(user, top_n, k)
 
-    # Walidacja: Tytułu nie znaleziono w bazie, zwracamy błąd 404 (Not Found)
+    # Jeżeli zwróci None (czyli nie było takiego usera w pliku CSV), błąd HTTP 404
     if results is None:
-        return jsonify({"error": "Film nie znaleziony w bazie"}), 404
+        return jsonify({"error": "Uzytkownik nie znaleziony w bazie"}), 404
 
-    # Sukces: Zwracamy listę polecanych filmów jako JSON
+    # Zwracamy spakowany wynik (tytuł, przewidywana ocena i dla kogo z sąsiadów)
     return jsonify(results)
 
 if __name__ == "__main__":
