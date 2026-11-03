@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
@@ -19,8 +19,17 @@ PRODUCTS = [
 def health():
     return jsonify({"status": "ok"})
 
+
 @app.route("/api/products")
 def products():
+    # Pobranie parametru max_price z zapytania HTTP
+    max_price = request.args.get("max_price", type=float)
+
+    if max_price is not None:
+        # Zwrócenie tylko tych produktów, które są tańsze lub w tej samej cenie
+        filtered_products = [p for p in PRODUCTS if p["cena"] <= max_price]
+        return jsonify(filtered_products)
+
     return jsonify(PRODUCTS)
 
 @app.route("/api/products/<int:product_id>")
