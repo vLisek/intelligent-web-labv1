@@ -43,5 +43,28 @@ def get_product(product_id):
 
     return jsonify(product)
 
+@app.route("/api/products", methods=["POST"])
+def add_product():
+    data = request.get_json()
+
+    # Prosta walidacja czy w przesłanym JSON-ie są wymagane pola
+    if not data or not "nazwa" in data or not "cena" in data:
+        return jsonify({"error": "Brak wymaganych danych (nazwa, cena)"}), 400
+
+    # Wyliczanie nowego ID (najwyższe dotychczasowe + 1)
+    new_id = max((p["id"] for p in PRODUCTS), default=0) + 1
+
+    new_product = {
+        "id": new_id,
+        "nazwa": data["nazwa"],
+        "kategoria": data.get("kategoria", "inne"),
+        "cena": data["cena"],
+        "opis": data.get("opis", "")
+    }
+
+    PRODUCTS.append(new_product)
+    # Zwracamy dodany produkt i kod 201 Created
+    return jsonify(new_product), 201
+
 if __name__ == "__main__":
     app.run(debug=True)
