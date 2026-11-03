@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request
+from recommender import recommend
 
 app = Flask(__name__)
 
@@ -65,6 +66,31 @@ def add_product():
     PRODUCTS.append(new_product)
     # Zwracamy dodany produkt i kod 201 Created
     return jsonify(new_product), 201
+
+@app.route("/api/recommend")
+def api_recommend():
+    # Pobranie parametrów z URL
+    title = request.args.get("title")
+    top_n = request.args.get("top_n", default=5, type=int)
+    genre = request.args.get("genre")  # Filtr dla zadania z wyzwaniem
+
+    # Walidacja: Brak tytułu zwraca błąd 400 (Bad Request)
+    if not title:
+        return jsonify({"error": "Brak parametru title"}), 400
+
+    # Walidacja: top_n musi być z przedziału 1-10, inaczej wymuszamy domyślne 5
+    if not (1 <= top_n <= 10):
+        top_n = 5
+
+    # Wywołanie funkcji z recommender.py
+    results = recommend(title, top_n, genre)
+
+    # Walidacja: Tytułu nie znaleziono w bazie, zwracamy błąd 404 (Not Found)
+    if results is None:
+        return jsonify({"error": "Film nie znaleziony w bazie"}), 404
+
+    # Sukces: Zwracamy listę polecanych filmów jako JSON
+    return jsonify(results)
 
 if __name__ == "__main__":
     app.run(debug=True)
