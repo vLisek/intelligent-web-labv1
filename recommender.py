@@ -4,6 +4,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 # Wczytanie bazy ocen i tworzenie macierzy
 df = pd.read_csv("ratings.csv")
 matrix = df.pivot_table(index="user", columns="title", values="rating")
+users_list = matrix.index.tolist()
 
 # Wyśrodkowanie ocen, by poprawnie wyłapać odchylenia od gustu
 means = matrix.mean(axis=1)  # średnia ocena każdego użytkownika
@@ -50,3 +51,6 @@ def recommend(user, top_n=5, k=3):
              "predicted": round(float(s), 2),
              "because": [o for o, w in neighbors.items() if not pd.isna(matrix.loc[o, t])]}
             for t, s in best]
+
+if __name__ == "__main__":
+    print(recommend("Ania"))
