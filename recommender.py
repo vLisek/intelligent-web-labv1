@@ -1,50 +1,52 @@
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Wczytanie bazy z csv i załatanie braków w opisach
-df = pd.read_csv("movies.csv")
-df["overview"] = df["overview"].fillna("")
+# Wczytanie bazy ocen i tworzenie macierzy
+df = pd.read_csv("ratings.csv")
+matrix = df.pivot_table(index="user", columns="title", values="rating")
 
-# Budowa macierzy TF-IDF
-vectorizer = TfidfVectorizer(stop_words="english")
-tfidf_matrix = vectorizer.fit_transform(df["overview"])
+# Wyśrodkowanie ocen, by poprawnie wyłapać odchylenia od gustu
+means = matrix.mean(axis=1)  # średnia ocena każdego użytkownika
+centered = matrix.sub(means, axis=0).fillna(0)
 
-# Wyliczenie macierzy podobieństw
-sim_matrix = cosine_similarity(tfidf_matrix)
+# Liczymy podobieństwo (cosine similarity) odchyleń gustu
+sim = pd.DataFrame(cosine_similarity(centered), index=matrix.index, columns=matrix.index)
 
 
-def recommend(title, top_n=5, genre=None):
-    # Znalezienie id wiersza
-    match = df[df["title"].str.lower() == title.lower()]
-
-    if match.empty:
+def recommend(user, top_n=5, k=3):
+    if user not in matrix.index:
         return None
 
-    idx = match.index[0]
+    # Sortujemy znajomych/sąsiadów od najbardziej podobnego i bierzemy K najbliższych
+    neighbors = sim[user].drop(user).sort_values(ascending=False).head(k)
 
-    # Wyciągnięcie wyników dla szukanego filmu i ich posortowanie malejąco
-    scores = sorted(enumerate(sim_matrix[idx]), key=lambda x: x[1], reverse=True)
+    scores = {}
 
-    recommendations = []
-    # Lecimy po wynikach z pominięciem pętli dla samego siebie -> i != idx
-    for i, s in scores:
-        if i == idx:
+    # Przechodzimy przez wszystkie filmy w bazie
+    for movie in matrix.columns:
+        # Jeśli nasz klient już ocenił/oglądał ten film, pomijamy go (szukamy NaN)
+        if not pd.isna(matrix.loc[user, movie]):
             continue
 
-        # Zabezpieczenie jeśli klient podał filtr 'genre'
-        if genre and genre.lower() not in df["genres"][i].lower():
-            continue
+        num, den = 0.0, 0.0
 
-        # Tworzenie słownika JSON-able
-        recommendations.append({
-            "title": df["title"][i],
-            "genres": df["genres"][i],
-            "rating": round(float(df["rating"][i]), 1),
-            "score": round(float(s), 3)
-        })
+        # Pytamy k-najbliższych sąsiadów o ten konkretnie nieoglądany przez klienta film
+        for other, weight in neighbors.items():
+            r = matrix.loc[other, movie]
+            if not pd.isna(r):  # Jeśli sąsiad też to widział
+                num += weight * (r - means[other])  # Waga podobieństwa razy różnica gustu sąsiada
+                den += abs(weight)  # Sumujemy wagę podobieństwa (na minus lub plus - abs to wartość bezwzględna)
 
-        if len(recommendations) >= top_n:
-            break
+        # Składamy wyniki i przewidujemy ocenę z przedziału 1.0 do 5.0
+        if den > 0:
+            predicted_rating = means[user] + (num / den)
+            scores[movie] = max(1.0, min(5.0, predicted_rating))
 
-    return recommendations
+    # Sortujemy nasze wyliczenia od najlepszego filmu i przycinamy listę do top_n
+    best = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_n]
+
+    # Pakujemy odpowiedź na kształt pożądanego w instrukcji JSONa
+    return [{"title": t,
+             "predicted": round(float(s), 2),
+             "because": [o for o, w in neighbors.items() if not pd.isna(matrix.loc[o, t])]}
+            for t, s in best]
