@@ -23,5 +23,16 @@ def health():
 def products():
     return jsonify(PRODUCTS)
 
+@app.route("/api/products/<int:product_id>")
+def get_product(product_id):
+    # Szuka produktu w liście PRODUCTS
+    product = next((p for p in PRODUCTS if p["id"] == product_id), None)
+
+    if product is None:
+        # Zwraca błąd 404 i JSON, jeśli nie znaleziono
+        return jsonify({"error": "Produkt nie zostal znaleziony"}), 404
+
+    return jsonify(product)
+
 if __name__ == "__main__":
     app.run(debug=True)
